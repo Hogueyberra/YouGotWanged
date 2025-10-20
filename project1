@@ -2,7 +2,7 @@ git init
 git add .
 git commit -m "Initial commit - YouGotWanged fantasy trade tracker"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/yougotwanged.git
+git remote add origin https://github.com/Hogueyberra/yougotwanged.git
 git push -u origin main
 git add package.json
 git commit -m "Fix package name for Vercel deployment"
