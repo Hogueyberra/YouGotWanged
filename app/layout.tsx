@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Untitled site',
+  title: 'Fantasy Front Office',
+  description:
+    'A private trade and roster workspace for auction and superflex fantasy football leagues.',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
