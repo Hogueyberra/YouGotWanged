@@ -10,9 +10,14 @@ Yahoo has not confirmed.
 
 **Application type:** Server-side web application
 
-**Home page/domain:** Temporary deployment domain pending
+**Temporary application domain:** `https://fantasy-front-office-nick.hougeyberra.chatgpt.site`
 
-**Callback URL:** `https://<temporary-domain>/api/integrations/yahoo/callback`
+**Proposed callback URL:** `https://fantasy-front-office-nick.hougeyberra.chatgpt.site/api/integrations/yahoo/callback`
+
+This domain is currently owner-private. Its About/Privacy pages are not public
+application-review pages. The callback route and live OAuth are not implemented
+yet. Do not submit the proposed callback as working until implemented and tested;
+prepare an appropriately accessible application website before submitting.
 
 The callback must exactly match the final server route and the value used for
 the authorization-code exchange.

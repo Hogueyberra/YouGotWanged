@@ -33,13 +33,18 @@ All players, projections, auction prices, scores, and league identities shown by
 
 ## Temporary deployment
 
-Private owner-only publication is being prepared for:
+Version 1 was published successfully with owner-only access at:
 
 https://fantasy-front-office-nick.hougeyberra.chatgpt.site
 
 Site project: `appgprj_6a9b5141010481919be480f463afc463`.
 
-The release receipt will be updated after the deployment reaches a terminal state. This URL is separate from remote control of the Codex build task. The hosted application is intended to work without the office desktop remaining awake; editing this local project remotely depends on the desktop's Remote connection.
+Initial release commit: `702659cee1daf7f809beddf2c4df6ea55ce469ce`.
+Initial deployment: `appgdep_6a9b54db7e248191b66412061035ab3b` (succeeded 2026-09-04 23:32 UTC).
+
+Hosted verification: the signed-in browser opened the workspace as its authenticated owner and loaded D1-backed state. WebMCP context and navigation passed hosted read-back checks. Anonymous and forged-identity-header requests returned 401; the platform's publication inspection token alone did not bypass application sign-in. No production test trade data was inserted.
+
+This URL is separate from remote control of the Codex build task. The hosted application works without the office desktop remaining awake; editing this local project remotely depends on the desktop's Remote connection.
 
 ## Credential- or decision-blocked work
 

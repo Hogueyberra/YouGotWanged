@@ -150,7 +150,7 @@ export function OverviewView({
     <div className="ffo-view-stack">
       <ViewIntro
         eyebrow={`Week ${league.week} command center`}
-        title={`Good afternoon, ${team?.manager ?? 'General Manager'}.`}
+        title="Your front office."
         description="Your roster, league position, and next decision—organized from one frozen demo snapshot."
         action={
           <Button className="ffo-accent-button" size="lg" onClick={onOpenTrade}>

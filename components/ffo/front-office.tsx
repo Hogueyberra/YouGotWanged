@@ -364,7 +364,9 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
               >
                 <SelectTrigger aria-label="Active league">
                   <BarChart3 />
-                  <SelectValue />
+                  <SelectValue>
+                    {league ? `${league.name} · ${league.season}` : 'Choose a league'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {initial.leagues.map((item) => (

@@ -474,7 +474,9 @@ function SavedTradeDialog({
                 onValueChange={(value) => setNextStatus(value as SavedTrade['status'] | null)}
               >
                 <SelectTrigger className="ffo-status-select" aria-label="Next trade status">
-                  <SelectValue placeholder="Choose next status" />
+                  <SelectValue>
+                    {nextStatus ? statusLabels[nextStatus] : 'Choose next status'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {allowed.map((status) => (
@@ -679,7 +681,11 @@ export function TradeCenter({
                 <Select value={partnerId} onValueChange={changePartner} disabled={inputsLocked}>
                   <SelectTrigger id="trade-partner" aria-labelledby="partner-label">
                     <UsersRound />
-                    <SelectValue placeholder="Choose a team" />
+                    <SelectValue>
+                      {partnerId
+                        ? `${getTeam(league, partnerId)?.name ?? 'Unknown team'} · ${getTeam(league, partnerId)?.manager ?? 'Unknown manager'}`
+                        : 'Choose a team'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {otherTeams.map((team) => (
