@@ -33,7 +33,7 @@ All players, projections, auction prices, scores, and league identities shown by
 
 ## Temporary deployment
 
-Version 1 was published successfully with owner-only access at:
+Version 2 is published successfully with owner-only access at:
 
 https://fantasy-front-office-nick.hougeyberra.chatgpt.site
 
@@ -41,6 +41,11 @@ Site project: `appgprj_6a9b5141010481919be480f463afc463`.
 
 Initial release commit: `702659cee1daf7f809beddf2c4df6ea55ce469ce`.
 Initial deployment: `appgdep_6a9b54db7e248191b66412061035ab3b` (succeeded 2026-09-04 23:32 UTC).
+
+Current application release commit: `fb034dcccb295e725ba94558f824dcb6f34b875f`.
+Current saved version: `appgprj_6a9b5141010481919be480f463afc463~appgver_e8e642d1ac90819185d6d82f661c3026`.
+Current deployment: `appgdep_6a9b558a75e88191be5ad10608898ad2` (succeeded 2026-09-04 23:34 UTC).
+The second version corrects human-readable selector labels, removes the fictional-manager greeting, and applies the project favicon. The later release-receipt documentation commit does not change application behavior.
 
 Hosted verification: the signed-in browser opened the workspace as its authenticated owner and loaded D1-backed state. WebMCP context and navigation passed hosted read-back checks. Anonymous and forged-identity-header requests returned 401; the platform's publication inspection token alone did not bypass application sign-in. No production test trade data was inserted.
 
