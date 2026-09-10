@@ -55,8 +55,10 @@ resource-specific normalizer and fixtures exist.
 
 The repository contains pure helpers for authorization URL construction,
 cryptographically random state, hashed state comparison, and refresh-token
-rotation. It does not expose a connection route or token exchange without an
-approved Yahoo application and secrets.
+rotation. Connect/callback/status/disconnect routes and encrypted token
+persistence are scaffolded under `/api/integrations/yahoo/*`, but live Fantasy
+ingest stays disabled until approval, secrets, and contract validation gates
+pass.
 
 When the flow is implemented:
 

@@ -61,3 +61,38 @@ export const tradeEvents = sqliteTable(
     index('events_owner_league').on(t.ownerId, t.leagueId, t.tradeId),
   ],
 );
+
+
+export const oauthStates = sqliteTable(
+  'oauth_states',
+  {
+    stateHash: text('state_hash').primaryKey(),
+    actorId: text('actor_id').notNull(),
+    provider: text('provider').notNull().default('yahoo'),
+    expiresAt: text('expires_at').notNull(),
+    consumedAt: text('consumed_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('oauth_states_actor').on(t.actorId),
+    index('oauth_states_expires').on(t.expiresAt),
+    check(
+      'oauth_states_provider',
+      sql`${t.provider} IN ('yahoo')`,
+    ),
+  ],
+);
+
+export const yahooConnections = sqliteTable(
+  'yahoo_connections',
+  {
+    ownerId: text('owner_id').primaryKey(),
+    encryptedAccessToken: text('encrypted_access_token').notNull(),
+    encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
+    tokenType: text('token_type').notNull().default('Bearer'),
+    accessTokenExpiresAt: text('access_token_expires_at'),
+    updatedAt: text('updated_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('yahoo_connections_updated').on(t.updatedAt)],
+);
