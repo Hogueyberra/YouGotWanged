@@ -80,3 +80,11 @@ parent local workspace are not part of this application repository.
 `npm run check` (type checking, lint, and 50 tests) and `npm run build` passed again
 on September 9. This source-repository setup does not change or redeploy the
 private Sites application described above.
+
+GitHub upload is currently **pending authorization**: the HTTPS push was rejected
+because the active GitHub CLI OAuth login lacks `workflow` scope for the included
+`.github/workflows/ci.yml`. Existing SSH authentication was also unavailable.
+The remote branch remains at `e874a50ef812d870bffeb5d6da380b4706b97e4d`; no remote
+files were changed. After the owner completes `gh auth refresh -h github.com -s
+workflow`, retry the non-force push of local `main` to `origin/main` and verify
+the remote commit matches. Local source and the preserved histories are committed.
