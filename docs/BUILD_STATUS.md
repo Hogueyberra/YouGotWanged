@@ -67,3 +67,16 @@ The app has no live AI assistant, automated trade recommendations, live news, wa
 ## Resume here
 
 Read `AGENTS.md`, this file, `docs/ARCHITECTURE.md`, and `docs/PROVIDER_PLAN.md`. Run `npm ci`, `npm run db:migrate:local`, and `npm run dev` for local work. Keep live Yahoo ingestion disabled until its gates are satisfied.
+
+## GitHub source — September 9, 2026
+
+The application's `origin` remote is https://github.com/Hogueyberra/YouGotWanged,
+using branch `main`. The existing GitHub `project1` notes file and both of its
+commits were merged into the application history without overwriting them.
+Application code, documentation, project skills, review agents, and migrations
+live at the GitHub repository root. The original reference deposits in the
+parent local workspace are not part of this application repository.
+
+`npm run check` (type checking, lint, and 50 tests) and `npm run build` passed again
+on September 9. This source-repository setup does not change or redeploy the
+private Sites application described above.
