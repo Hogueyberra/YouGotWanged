@@ -15,9 +15,11 @@ Yahoo has not confirmed.
 **Proposed callback URL:** `https://fantasy-front-office-nick.hougeyberra.chatgpt.site/api/integrations/yahoo/callback`
 
 This domain is currently owner-private. Its About/Privacy pages are not public
-application-review pages. The callback route and live OAuth are not implemented
-yet. Do not submit the proposed callback as working until implemented and tested;
-prepare an appropriately accessible application website before submitting.
+application-review pages. The callback and connect routes are scaffolded in
+code, but live OAuth against Yahoo still requires application approval and
+installed secrets. Do not submit the proposed callback as working until tested
+with real credentials; prepare an appropriately accessible application website
+before submitting.
 
 The callback must exactly match the final server route and the value used for
 the authorization-code exchange.

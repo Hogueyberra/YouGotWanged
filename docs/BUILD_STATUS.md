@@ -56,7 +56,7 @@ This URL is separate from remote control of the Codex build task. The hosted app
 1. Obtain Yahoo Fantasy read approval and application credentials.
 2. Confirm which projection, news, and auction fields are actually exposed; inspect authorized live fixtures.
 3. Confirm Yahoo caching, historical storage, export, derived-data, and AI-processing permissions.
-4. Implement encrypted user-token persistence, account-bound single-use OAuth state, refresh locking/rotation, revocation, TTL enforcement, and sync orchestration before enabling Yahoo.
+4. OAuth scaffolding (encrypted token persistence, account-bound single-use state, connect/callback/status/disconnect) is present on `feat/yahoo-oauth-scaffolding`. Still needed before enabling Yahoo: refresh locking, retention TTL purge, sync orchestration, live fixtures, and approval gates.
 5. Import the real league rules and rosters; do not treat demo settings as the user's final settings.
 6. Select permitted news feeds and implement provenance/deduplication/source-quality evaluation. No news scraping or cron runs are active.
 7. Evaluate X/xAI later, after sources, costs, access terms, and scope are approved.
@@ -85,3 +85,28 @@ GitHub upload is **complete**. The owner approved the GitHub CLI authorization
 needed for the included CI workflow, and the non-force push to `origin/main`
 succeeded. Local `main` now tracks `origin/main`. The original GitHub notes and
 history remain intact, and the private Sites deployment is unchanged.
+
+
+## Yahoo OAuth scaffolding — September 9, 2026
+
+Local branch `feat/yahoo-oauth-scaffolding` adds connect/callback/status/disconnect
+API scaffolding, hashed single-use OAuth state, and encrypted Yahoo token
+persistence (AES-GCM via `YAHOO_TOKEN_ENCRYPTION_KEY`).
+
+**Still gated / not activated:**
+
+- Live Yahoo Fantasy ingest remains OFF. Demo data is still the default for
+  league screens and services; the adapter is not wired into overview or trade
+  paths.
+- Fantasy API application approval is still pending
+  (`YAHOO_APPLICATION_APPROVED` stays false until recorded).
+- Live contract validation remains pending
+  (`YAHOO_LIVE_CONTRACT_VALIDATED`).
+- Secrets must be installed server-side before connect can succeed; do not
+  commit them.
+
+Try connect only after secrets exist: sign in, open
+`/api/integrations/yahoo/connect`, complete Yahoo consent, land on
+`/api/integrations/yahoo/callback`. Inspect readiness at
+`/api/integrations/yahoo/status`. Disconnect with POST
+`/api/integrations/yahoo/disconnect`.
