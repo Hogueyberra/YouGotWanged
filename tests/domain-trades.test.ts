@@ -52,6 +52,7 @@ function makeTradeLeague(): League {
   return {
     id: 'test-league',
     name: 'Synthetic Test League',
+    sport: 'football',
     season: 2026,
     week: 1,
     teamCount: 2,
@@ -333,4 +334,140 @@ void test('a league snapshot newer than as_of is rejected', () => {
   expectDomainError('INVALID_LEAGUE_SNAPSHOT', () =>
     analyzeTrade(league, makeRequest()),
   );
+});
+
+void test('optimizeLineup handles basketball slots and flex eligibility', () => {
+  // Strict slots: each basketball position fills exactly its own slot.
+  const strictPlayers = [
+    makePlayer('pg-star', 'PG', 30),
+    makePlayer('sg-star', 'SG', 25),
+    makePlayer('sf-star', 'SF', 20),
+  ];
+  const strictSlots: StartingSlot[] = [
+    { id: 'pg', label: 'PG', eligible: ['PG'] },
+    { id: 'sg', label: 'SG', eligible: ['SG'] },
+    { id: 'sf', label: 'SF', eligible: ['SF'] },
+  ];
+  const strict = optimizeLineup(strictPlayers, strictSlots);
+  assert.equal(strict.total, 75);
+  assert.deepEqual(strict.missing, []);
+  const strictAssigned = new Map(
+    strict.assignments.map((assignment) => [
+      assignment.slotId,
+      assignment.playerId,
+    ]),
+  );
+  assert.equal(strictAssigned.get('pg'), 'pg-star');
+  assert.equal(strictAssigned.get('sg'), 'sg-star');
+  assert.equal(strictAssigned.get('sf'), 'sf-star');
+
+  // Flex slots: G accepts PG/SG and UTIL accepts any basketball position.
+  const flexPlayers = [
+    makePlayer('flex-pg', 'PG', 30),
+    makePlayer('flex-sg', 'SG', 25),
+  ];
+  const flexSlots: StartingSlot[] = [
+    { id: 'g', label: 'G', eligible: ['PG', 'SG'] },
+    {
+      id: 'util',
+      label: 'UTIL',
+      eligible: ['PG', 'SG', 'SF', 'PF', 'C'],
+    },
+  ];
+  const flex = optimizeLineup(flexPlayers, flexSlots);
+  assert.equal(flex.total, 55);
+  assert.deepEqual(flex.missing, []);
+  assert.equal(flex.assignments.length, 2);
+});
+
+void test('optimizeLineup reports missing projections instead of coercing to zero', () => {
+  const players = [
+    makePlayer('pg-known', 'PG', 30),
+    makePlayer('sg-unknown', 'SG', null),
+  ];
+  const slots: StartingSlot[] = [
+    { id: 'pg', label: 'PG', eligible: ['PG'] },
+    { id: 'sg', label: 'SG', eligible: ['SG'] },
+  ];
+
+  const result = optimizeLineup(players, slots);
+
+  assert.equal(result.total, null);
+  assert.ok(
+    result.missing.some((message) => message.includes('sg-unknown')),
+    'missing projection must be reported',
+  );
+  assert.equal(result.assignments.length, 1);
+  assert.equal(result.assignments[0]?.playerId, 'pg-known');
+});
+
+void test('analyzeTrade on a Yahoo league is honest about missing projections', () => {
+  const players = [
+    { ...makePlayer('yahoo-pg-1', 'PG', null), eligiblePositions: ['PG'] as Position[] },
+    { ...makePlayer('yahoo-sg-1', 'SG', null), eligiblePositions: ['SG'] as Position[] },
+  ];
+  const league: League = {
+    ...makeTradeLeague(),
+    id: '418.l.67890',
+    name: 'Hoops League',
+    sport: 'basketball',
+    source: 'yahoo',
+    providerLeagueKey: '418.l.67890',
+    draftType: 'snake',
+    superflex: false,
+    budget: 0,
+    startingSlots: [
+      { id: 'pg', label: 'PG', eligible: ['PG'] },
+      { id: 'sg', label: 'SG', eligible: ['SG'] },
+    ],
+    myTeamId: 'yahoo-team-1',
+    teams: [
+      {
+        id: 'yahoo-team-1',
+        name: 'Nick Hoops',
+        manager: 'Nick',
+        abbreviation: 'NH',
+        wins: 8,
+        losses: 2,
+        pointsFor: 100,
+        faabRemaining: 87,
+        playerIds: ['yahoo-pg-1'],
+      },
+      {
+        id: 'yahoo-team-2',
+        name: 'Rival Hoops',
+        manager: 'Rival',
+        abbreviation: 'RH',
+        wins: 5,
+        losses: 5,
+        pointsFor: 90,
+        faabRemaining: 100,
+        playerIds: ['yahoo-sg-1'],
+      },
+    ],
+    players,
+    teamCount: 2,
+  };
+  const request: TradeRequest = {
+    leagueId: league.id,
+    fromTeamId: 'yahoo-team-1',
+    toTeamId: 'yahoo-team-2',
+    givePlayerIds: ['yahoo-pg-1'],
+    receivePlayerIds: ['yahoo-sg-1'],
+    asOf: SNAPSHOT_AT,
+  };
+
+  const analysis = analyzeTrade(league, request);
+
+  assert.equal(analysis.verdict, 'unavailable');
+  assert.match(analysis.summary, /Yahoo does not provide player projections/);
+  assert.ok(
+    analysis.warnings.some((warning) => warning.includes('read-only')),
+    'warnings must describe the Yahoo read-only limitation',
+  );
+  assert.equal(
+    analysis.evidence.source,
+    'Yahoo Fantasy Sports (read-only snapshot; no projections available)',
+  );
+  assert.equal(analysis.version, 'yahoo-trade-analysis-v1');
 });

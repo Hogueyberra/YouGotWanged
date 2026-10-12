@@ -74,7 +74,12 @@ export interface ReadOnlyFantasyProvider {
   ): Promise<CapturedNormalization<readonly ProviderTeam[]>>;
   fetchPlayers(
     leagueKey: string,
-    options?: { start?: number; count?: number },
+    options?: {
+      start?: number;
+      count?: number;
+      status?: 'A' | 'FA' | 'W';
+      sort?: 'OR' | 'AR' | 'PTS';
+    },
   ): Promise<CapturedNormalization<readonly ProviderPlayer[]>>;
   fetchRoster(
     teamKey: string,
@@ -83,6 +88,12 @@ export interface ReadOnlyFantasyProvider {
   fetchTransactions(
     leagueKey: string,
   ): Promise<CapturedNormalization<readonly ProviderTransaction[]>>;
+  fetchSettings(
+    leagueKey: string,
+  ): Promise<CapturedNormalization<YahooLeagueSettings>>;
+  fetchStandings(
+    leagueKey: string,
+  ): Promise<CapturedNormalization<readonly YahooTeamStanding[]>>;
 }
 
 export interface ProviderLeague {
@@ -103,6 +114,10 @@ export interface ProviderTeam {
   abbreviation: string | null;
   url: string | null;
   managerName: string | null;
+  /** Remaining FAAB budget, when the league uses FAAB waivers. */
+  faabBalance: number | null;
+  /** True for the team managed by the authenticated Yahoo user. */
+  isCurrentLogin: boolean | null;
 }
 
 export interface ProviderPlayer {
@@ -127,4 +142,28 @@ export interface ProviderTransaction {
   type: string | null;
   status: string | null;
   occurredAt: string | null;
+  /** Winning FAAB bid for waiver claims, when present. */
+  faabBid: number | null;
+  /** Full names of players involved in the transaction. */
+  playerNames: readonly string[];
+}
+
+export interface YahooRosterPositionSetting {
+  position: string;
+  positionType: string | null;
+  count: number;
+}
+
+export interface YahooLeagueSettings {
+  draftType: string | null;
+  isAuctionDraft: boolean | null;
+  rosterPositions: YahooRosterPositionSetting[];
+}
+
+export interface YahooTeamStanding {
+  teamKey: string;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  pointsFor: number | null;
 }

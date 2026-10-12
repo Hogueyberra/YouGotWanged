@@ -146,6 +146,9 @@ void test('overview scopes saved trades to the server-derived actor', async () =
       listedOwner = ownerId;
       return [];
     },
+    async getYahooTokens() {
+      return null;
+    },
   } as unknown as TradeRepository;
 
   const result = await overview(repository, {

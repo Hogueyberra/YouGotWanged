@@ -17,6 +17,12 @@ const PERCENT_ENCODED_UTF8 = 'percent-encoded-utf-8';
 const SIGN_IN_PATH = '/signin-with-chatgpt';
 const SIGN_OUT_PATH = '/signout-with-chatgpt';
 const CALLBACK_PATH = '/callback';
+/**
+ * Password gate for Cloudflare Workers deployments, where the Sites
+ * platform's identity headers don't exist. `/signin` delegates back to the
+ * platform flow when those headers are present.
+ */
+const PASSWORD_SIGN_IN_PATH = '/signin';
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
@@ -45,7 +51,12 @@ export async function requireChatGPTUser(
   const user = await getChatGPTUser();
   if (user) return user;
 
-  redirect(chatGPTSignInPath(returnTo));
+  redirect(passwordSignInPath(returnTo));
+}
+
+export function passwordSignInPath(returnTo: string): string {
+  const safeReturnTo = safeRelativeReturnPath(returnTo);
+  return `${PASSWORD_SIGN_IN_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
 }
 
 export function chatGPTSignInPath(returnTo: string): string {
@@ -77,7 +88,8 @@ function isReservedAuthPath(pathname: string): boolean {
   return (
     pathname === SIGN_IN_PATH ||
     pathname === SIGN_OUT_PATH ||
-    pathname === CALLBACK_PATH
+    pathname === CALLBACK_PATH ||
+    pathname === PASSWORD_SIGN_IN_PATH
   );
 }
 

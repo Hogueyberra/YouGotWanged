@@ -61,3 +61,25 @@ export const tradeEvents = sqliteTable(
     index('events_owner_league').on(t.ownerId, t.leagueId, t.tradeId),
   ],
 );
+
+export const yahooOauthState = sqliteTable(
+  'yahoo_oauth_state',
+  {
+    stateHash: text('state_hash').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('yahoo_oauth_state_owner').on(t.ownerId)],
+);
+
+export const yahooOauthTokens = sqliteTable(
+  'yahoo_oauth_tokens',
+  {
+    ownerId: text('owner_id').primaryKey(),
+    accessTokenEnc: text('access_token_enc').notNull(),
+    refreshTokenEnc: text('refresh_token_enc').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+);

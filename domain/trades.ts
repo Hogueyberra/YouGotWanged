@@ -1,6 +1,7 @@
 import { DomainError } from './errors.ts';
 import type {
   League,
+  LeagueSource,
   LineupAssignment,
   OptimizedLineup,
   Player,
@@ -11,7 +12,8 @@ import type {
   TradeSideAnalysis,
 } from './types.ts';
 
-const ANALYSIS_VERSION = 'demo-trade-analysis-v1';
+const DEMO_ANALYSIS_VERSION = 'demo-trade-analysis-v1';
+const YAHOO_ANALYSIS_VERSION = 'yahoo-trade-analysis-v1';
 const COMPARISON_EPSILON = 0.01;
 
 interface LineupPlan {
@@ -361,8 +363,13 @@ function prepareObservations(
   asOfTimestamp: number,
   missingSignals: Set<string>,
   warnings: Set<string>,
+  source: LeagueSource,
 ): Map<string, Player> {
   const prepared = new Map<string, Player>();
+  // Yahoo's read-only API exposes no projections; a single summary signal
+  // replaces per-player noise. Demo leagues carry synthetic projections, so
+  // missing ones are called out individually.
+  const expectProjections = source === 'demo';
 
   for (const player of players) {
     const projectedAt = parseTimestamp(
@@ -385,15 +392,17 @@ function prepareObservations(
       continue;
     }
 
-    if (relevantToLineup && player.weeklyProjection === null) {
+    if (relevantToLineup && player.weeklyProjection === null && expectProjections) {
       missingSignals.add(`${player.name} has no weekly projection.`);
     }
-    if (relevantToLineup && player.rosProjection === null) {
+    if (relevantToLineup && player.rosProjection === null && expectProjections) {
       missingSignals.add(`${player.name} has no rest-of-season projection.`);
     }
     if (relevantToLineup && player.status === 'out') {
       warnings.add(
-        `${player.name} is marked out in the synthetic demo snapshot.`,
+        source === 'demo'
+          ? `${player.name} is marked out in the synthetic demo snapshot.`
+          : `${player.name} is marked out in the Yahoo snapshot.`,
       );
     }
 
@@ -501,24 +510,29 @@ function determineVerdict(
 function buildSummary(
   verdict: TradeAnalysis['verdict'],
   side: TradeSideAnalysis,
+  source: LeagueSource,
 ): string {
   if (
     verdict === 'unavailable' ||
     side.lineupDelta === null ||
     side.rosDelta === null
   ) {
-    return 'The trade cannot be graded because the available pre-trade evidence is incomplete or the resulting roster requires an unspecified drop.';
+    return source === 'demo'
+      ? 'The trade cannot be graded because the available pre-trade evidence is incomplete or the resulting roster requires an unspecified drop.'
+      : 'The trade cannot be graded on projected points because Yahoo does not provide player projections through its read-only API.';
   }
 
   const weekly = formatDelta(side.lineupDelta);
   const ros = formatDelta(side.rosDelta);
+  const subject =
+    source === 'demo' ? 'The synthetic projections' : 'The available data';
   if (verdict === 'improves') {
-    return `The synthetic projections improve the best legal lineup by ${weekly} weekly points and ${ros} rest-of-season starter points.`;
+    return `${subject} improve the best legal lineup by ${weekly} weekly points and ${ros} rest-of-season starter points.`;
   }
   if (verdict === 'weakens') {
-    return `The synthetic projections weaken the best legal lineup by ${weekly} weekly points and ${ros} rest-of-season starter points.`;
+    return `${subject} weaken the best legal lineup by ${weekly} weekly points and ${ros} rest-of-season starter points.`;
   }
-  return `The synthetic projections show a balanced or mixed trade-off: ${weekly} weekly lineup points and ${ros} rest-of-season starter points.`;
+  return `${subject} show a balanced or mixed trade-off: ${weekly} weekly lineup points and ${ros} rest-of-season starter points.`;
 }
 
 export function analyzeTrade(
@@ -555,17 +569,29 @@ export function analyzeTrade(
     return player;
   });
 
-  const warnings = new Set<string>([
-    'Synthetic demo projections are invented for product testing and are not current NFL facts.',
-    'Auction draft prices are historical costs and are not used as current trade value.',
-  ]);
+  const warnings = new Set<string>(
+    league.source === 'demo'
+      ? [
+          'Synthetic demo projections are invented for product testing and are not current NFL facts.',
+          'Auction draft prices are historical costs and are not used as current trade value.',
+        ]
+      : [
+          "Yahoo league data is read-only. Player projections are unavailable through Yahoo's API, so trades cannot be graded on projected points.",
+        ],
+  );
   const missingSignals = new Set<string>();
+  if (league.source === 'yahoo') {
+    missingSignals.add(
+      'Yahoo does not provide player projections; weekly and rest-of-season lineup values are unavailable.',
+    );
+  }
   const observations = prepareObservations(
     relevantPlayers,
     league.startingSlots,
     asOfTimestamp,
     missingSignals,
     warnings,
+    league.source,
   );
 
   const fromCapacityExceeded = fromAfterIds.length > league.rosterLimit;
@@ -613,7 +639,10 @@ export function analyzeTrade(
   });
 
   return {
-    version: ANALYSIS_VERSION,
+    version:
+      league.source === 'yahoo'
+        ? YAHOO_ANALYSIS_VERSION
+        : DEMO_ANALYSIS_VERSION,
     asOf: request.asOf,
     leagueId: league.id,
     fromTeamId: fromTeam.id,
@@ -621,13 +650,15 @@ export function analyzeTrade(
     givePlayerIds: [...request.givePlayerIds],
     receivePlayerIds: [...request.receivePlayerIds],
     verdict,
-    summary: buildSummary(verdict, from),
+    summary: buildSummary(verdict, from, league.source),
     from,
     to,
     warnings: [...warnings],
     evidence: {
       source:
-        'Synthetic demo data (invented projections; not Yahoo or live NFL data)',
+        league.source === 'demo'
+          ? 'Synthetic demo data (invented projections; not Yahoo or live NFL data)'
+          : 'Yahoo Fantasy Sports (read-only snapshot; no projections available)',
       capturedAt: league.snapshotAt,
     },
     inputs,

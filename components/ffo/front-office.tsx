@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { OverviewPayload, SavedTrade } from '@/domain/types';
+import type { League, OverviewPayload, SavedTrade } from '@/domain/types';
 import {
   ArrowLeftRight,
   BarChart3,
@@ -21,7 +21,10 @@ import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -52,6 +55,25 @@ import {
 import { TradeCenter } from './trade-center';
 
 type ViewKey = 'overview' | 'roster' | 'trades' | 'draft' | 'connections';
+
+type YahooLeagueSummary = {
+  key: string;
+  name: string;
+  sport: 'football' | 'basketball' | 'unknown';
+  season: number | null;
+  teamCount: number | null;
+  myTeamName: string | null;
+  error?: string;
+};
+
+/** Yahoo league keys look like "449.l.12345"; demo ids never contain a dot. */
+function isYahooLeagueId(id: string) {
+  return id.includes('.');
+}
+
+function sportLabel(sport: League['sport']) {
+  return sport === 'basketball' ? 'Basketball' : 'Football';
+}
 
 type RegisteredWebTool = {
   name: string;
@@ -94,10 +116,12 @@ function SidebarNavigation({
   activeView,
   onNavigate,
   savedCount,
+  yahooConnected,
 }: {
   activeView: ViewKey;
   onNavigate: (view: ViewKey) => void;
   savedCount: number;
+  yahooConnected: boolean;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -143,7 +167,9 @@ function SidebarNavigation({
               >
                 <PlugZap />
                 <span>Connections</span>
-                <span className="ffo-pending-dot" title="Yahoo approval pending" />
+                {!yahooConnected && (
+                  <span className="ffo-pending-dot" title="Yahoo approval pending" />
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -167,22 +193,119 @@ function Brand() {
 
 function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
   const [activeView, setActiveView] = useState<ViewKey>('overview');
-  const [leagueId, setLeagueId] = useState(initial.leagues[0]?.id ?? '');
+  const [selectedId, setSelectedId] = useState(initial.leagues[0]?.id ?? '');
   const [savedTrades, setSavedTrades] = useState<SavedTrade[]>(initial.trades);
   const [announcement, setAnnouncement] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [accountError, setAccountError] = useState('');
+  const [yahooSummaries, setYahooSummaries] = useState<
+    YahooLeagueSummary[] | null
+  >(null);
+  const [yahooListError, setYahooListError] = useState('');
+  const [yahooLeagues, setYahooLeagues] = useState<Record<string, League>>({});
+  const [yahooLoading, setYahooLoading] = useState(false);
+  const [yahooLoadError, setYahooLoadError] = useState('');
 
-  const league = useMemo(
-    () => initial.leagues.find((candidate) => candidate.id === leagueId) ?? null,
-    [initial.leagues, leagueId],
+  const league = useMemo(() => {
+    if (isYahooLeagueId(selectedId)) return yahooLeagues[selectedId] ?? null;
+    return (
+      initial.leagues.find((candidate) => candidate.id === selectedId) ?? null
+    );
+  }, [initial.leagues, selectedId, yahooLeagues]);
+  const leagueTradeCount = savedTrades.filter(
+    (trade) => trade.leagueId === selectedId,
+  ).length;
+
+  const footballSummaries = (yahooSummaries ?? []).filter(
+    (summary) => summary.sport === 'football',
   );
-  const leagueTradeCount = savedTrades.filter((trade) => trade.leagueId === leagueId).length;
+  const basketballSummaries = (yahooSummaries ?? []).filter(
+    (summary) => summary.sport === 'basketball',
+  );
+  const unknownSummaries = (yahooSummaries ?? []).filter(
+    (summary) => summary.sport === 'unknown',
+  );
+  const selectedSummary =
+    yahooSummaries?.find((summary) => summary.key === selectedId) ?? null;
+  const selectedLabel = isYahooLeagueId(selectedId)
+    ? (selectedSummary
+        ? `${selectedSummary.name} · ${selectedSummary.season ?? ''}`.trim()
+        : selectedId)
+    : league
+      ? `${league.name} · ${league.season}`
+      : 'Choose a league';
   const webContextRef = useRef({ activeView, league, savedTrades });
 
   useEffect(() => {
     webContextRef.current = { activeView, league, savedTrades };
   }, [activeView, league, savedTrades]);
+
+  // Load the user's real Yahoo leagues once Yahoo is connected. Demo leagues
+  // always stay available; Yahoo leagues load on demand when selected.
+  useEffect(() => {
+    if (!initial.provider.connected) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/leagues');
+        const payload = (await response.json().catch(() => ({}))) as {
+          leagues?: YahooLeagueSummary[];
+          error?: { message?: string };
+        };
+        if (!response.ok || payload.error) {
+          throw new Error(
+            payload.error?.message || 'Could not load your Yahoo leagues.',
+          );
+        }
+        if (!cancelled) setYahooSummaries(payload.leagues ?? []);
+      } catch (error) {
+        if (!cancelled) {
+          setYahooListError(
+            error instanceof Error
+              ? error.message
+              : 'Could not load your Yahoo leagues.',
+          );
+          setYahooSummaries([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initial.provider.connected]);
+
+  async function selectLeague(id: string) {
+    setSelectedId(id);
+    setActiveView('overview');
+    setYahooLoadError('');
+    if (!isYahooLeagueId(id) || yahooLeagues[id]) {
+      announce('League changed. Trade builder reset.');
+      return;
+    }
+    setYahooLoading(true);
+    try {
+      const response = await fetch(`/api/leagues/${encodeURIComponent(id)}`);
+      const payload = (await response.json().catch(() => ({}))) as {
+        league?: League;
+        error?: { message?: string };
+      };
+      if (!response.ok || payload.error || !payload.league) {
+        throw new Error(
+          payload.error?.message || 'Could not load this Yahoo league.',
+        );
+      }
+      setYahooLeagues((cache) => ({ ...cache, [id]: payload.league as League }));
+      announce('Yahoo league loaded. Trade builder reset.');
+    } catch (error) {
+      setYahooLoadError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load this Yahoo league.',
+      );
+    } finally {
+      setYahooLoading(false);
+    }
+  }
 
   function announce(message: string) {
     setAnnouncement('');
@@ -212,7 +335,7 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
             name: 'get_front_office_context',
             title: 'Get front office context',
             description:
-              'Read a concise summary of the selected demo fantasy league and its saved trade ideas.',
+              'Read a concise summary of the selected fantasy league (demo or Yahoo) and its saved trade ideas.',
             inputSchema: {
               type: 'object',
               properties: {},
@@ -333,11 +456,12 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
           activeView={activeView}
           onNavigate={navigate}
           savedCount={leagueTradeCount}
+          yahooConnected={initial.provider.connected}
         />
         <SidebarFooter>
           <div className="ffo-provider-mini">
             <span><ShieldCheck /></span>
-            <div><strong>Private workspace</strong><small>Yahoo access pending</small></div>
+            <div><strong>Private workspace</strong><small>{initial.provider.connected ? 'Yahoo connected' : 'Yahoo access pending'}</small></div>
           </div>
           <SidebarSeparator />
           <button type="button" className="ffo-user-mini" onClick={() => navigate('connections')}>
@@ -353,35 +477,85 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
           <div className="ffo-mobile-brand"><SidebarTrigger /><Brand /></div>
           <div className="ffo-league-switcher">
             <span>Active league</span>
-            {initial.leagues.length ? (
-              <Select
-                value={leagueId}
-                onValueChange={(value) => {
-                  setLeagueId(value ?? '');
-                  setActiveView('overview');
-                  announce('League changed. Trade builder reset.');
-                }}
-              >
-                <SelectTrigger aria-label="Active league">
-                  <BarChart3 />
-                  <SelectValue>
-                    {league ? `${league.name} · ${league.season}` : 'Choose a league'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
+            <Select value={selectedId} onValueChange={(value) => void selectLeague(value ?? '')}>
+              <SelectTrigger aria-label="Active league">
+                <BarChart3 />
+                <SelectValue>{selectedLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {footballSummaries.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Yahoo · Football</SelectLabel>
+                    {footballSummaries.map((summary) => (
+                      <SelectItem key={summary.key} value={summary.key}>
+                        {summary.name} · {summary.season}
+                        {summary.myTeamName ? ` · ${summary.myTeamName}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+                {basketballSummaries.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Yahoo · Basketball</SelectLabel>
+                    {basketballSummaries.map((summary) => (
+                      <SelectItem key={summary.key} value={summary.key}>
+                        {summary.name} · {summary.season}
+                        {summary.myTeamName ? ` · ${summary.myTeamName}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+                {unknownSummaries.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Yahoo · Other</SelectLabel>
+                    {unknownSummaries.map((summary) => (
+                      <SelectItem key={summary.key} value={summary.key}>
+                        {summary.name} · {summary.season}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+                <SelectGroup>
+                  <SelectLabel>Demo leagues</SelectLabel>
                   {initial.leagues.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.name} · {item.season}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <strong>No league</strong>
-            )}
+                </SelectGroup>
+                {!initial.provider.connected && (
+                  <>
+                    <SelectSeparator />
+                    <div className="ffo-connect-nudge">
+                      <PlugZap aria-hidden="true" />
+                      <button
+                        type="button"
+                        onClick={() => navigate('connections')}
+                      >
+                        Connect Yahoo to see your real leagues
+                      </button>
+                    </div>
+                  </>
+                )}
+                {yahooListError && (
+                  <>
+                    <SelectSeparator />
+                    <div className="ffo-connect-nudge ffo-connect-error" role="note">
+                      {yahooListError}
+                    </div>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
           </div>
           <div className="ffo-topbar-actions">
-            <Badge className="ffo-demo-top-badge"><Sparkles /> Demo league</Badge>
+            {league?.source === 'yahoo' ? (
+              <Badge className="ffo-yahoo-top-badge">
+                Yahoo · {sportLabel(league.sport)}
+              </Badge>
+            ) : (
+              <Badge className="ffo-demo-top-badge"><Sparkles /> Demo league</Badge>
+            )}
             <Button variant="ghost" size="icon" aria-label="Open connections" onClick={() => navigate('connections')}>
               <Settings2 />
             </Button>
@@ -389,8 +563,19 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
         </header>
 
         <div className="ffo-content" key={league?.id ?? 'empty'}>
-          {!league ? (
-            <EmptyLeagueView onConnections={() => navigate('connections')} />
+          {yahooLoading ? (
+            <output className="ffo-loading-league">
+              <span>Loading your Yahoo league…</span>
+            </output>
+          ) : !league ? (
+            <>
+              {yahooLoadError && (
+                <div className="ffo-form-error" role="alert">
+                  {yahooLoadError}
+                </div>
+              )}
+              <EmptyLeagueView onConnections={() => navigate('connections')} />
+            </>
           ) : activeView === 'overview' ? (
             <OverviewView league={league} onOpenTrade={() => navigate('trades')} />
           ) : activeView === 'roster' ? (
@@ -407,6 +592,8 @@ function FrontOfficeChrome({ initial }: { initial: OverviewPayload }) {
           ) : (
             <ConnectionsView
               providerMessage={initial.provider.message}
+              yahooConnected={initial.provider.connected}
+              yahooConnectEnabled={initial.provider.connectEnabled}
               onDeleteData={deleteSavedData}
               deleting={deleting}
             />

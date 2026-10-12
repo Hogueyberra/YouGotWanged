@@ -7,6 +7,9 @@ import type {
   ProviderRosterEntry,
   ProviderTeam,
   ProviderTransaction,
+  YahooLeagueSettings,
+  YahooRosterPositionSetting,
+  YahooTeamStanding,
 } from '../providers/contracts.ts';
 
 type JsonRecord = Record<string, unknown>;
@@ -342,8 +345,41 @@ export function normalizeYahooTeams(
       abbreviation: firstString(record, ['team_logos.abbreviation', 'abbrev']),
       url: firstString(record, ['url']),
       managerName: managerNames[0] ?? null,
+      faabBalance: firstNumber(record, ['faab_balance']),
+      isCurrentLogin: findBooleanByKey(record.managers, 'is_current_login'),
     };
   });
+}
+
+/**
+ * Recursively searches a value tree for a boolean-ish field, tolerating the
+ * object/array shape variations Yahoo uses for nested collections.
+ */
+function findBooleanByKey(
+  value: unknown,
+  keyName: string,
+  depth = 0,
+): boolean | null {
+  if (depth > 8 || value === null || typeof value !== 'object') return null;
+  if (Array.isArray(value)) {
+    for (const child of value) {
+      const found = findBooleanByKey(child, keyName, depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  const record = value as JsonRecord;
+  if (keyName in record) {
+    const direct = record[keyName];
+    if (typeof direct === 'boolean') return direct;
+    if (direct === 1 || direct === '1' || direct === 'true') return true;
+    if (direct === 0 || direct === '0' || direct === 'false') return false;
+  }
+  for (const child of Object.values(record)) {
+    const found = findBooleanByKey(child, keyName, depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 export function normalizeYahooPlayers(
@@ -388,14 +424,41 @@ export function normalizeYahooTransactions(
       return null;
     }
 
+    const playerNames: string[] = [];
+    collectTransactionPlayerNames(record.players, playerNames);
+
     return {
       providerTransactionKey: key,
       providerTransactionId: firstString(record, ['transaction_id']),
       type: firstString(record, ['type']),
       status: firstString(record, ['status']),
       occurredAt: normalizeTimestamp(firstString(record, ['timestamp'])),
+      faabBid: firstNumber(record, ['faab_bid']),
+      playerNames,
     };
   });
+}
+
+/** Collects full player names from a transaction's nested players payload. */
+function collectTransactionPlayerNames(
+  value: unknown,
+  output: string[],
+  depth = 0,
+): void {
+  if (depth > 10 || value === null || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const child of value)
+      collectTransactionPlayerNames(child, output, depth + 1);
+    return;
+  }
+  const record = value as JsonRecord;
+  if (typeof record['player_key'] === 'string') {
+    const name = firstString(record, ['name.full', 'name']);
+    if (name) output.push(name);
+    return;
+  }
+  for (const child of Object.values(record))
+    collectTransactionPlayerNames(child, output, depth + 1);
 }
 
 /**
@@ -407,4 +470,121 @@ export function normalizeYahooEnvelope(
   input: unknown,
 ): NormalizationResult<JsonRecord> {
   return requireFantasyContent(input);
+}
+
+/**
+ * Normalizes a league settings payload: draft format and the ordered roster
+ * position counts that define starting slots. Bench/IR slots are preserved
+ * here; callers decide which slots start.
+ */
+export function normalizeYahooSettings(
+  input: unknown,
+): NormalizationResult<YahooLeagueSettings> {
+  const root = requireFantasyContent(input);
+  if (!root.ok) return root;
+
+  const located: LocatedValue[] = [];
+  collectNamedValues(root.value, 'settings', '$.fantasy_content', located);
+  if (located.length === 0) {
+    return failure({
+      code: 'unknown_shape',
+      path: '$.fantasy_content',
+      message: 'No settings resource was found in the response.',
+      severity: 'error',
+    });
+  }
+
+  const settingsRecord = mergeFragments(located[0].value);
+  if (settingsRecord === null) {
+    return failure({
+      code: 'unknown_shape',
+      path: located[0].path,
+      message: 'settings resource was not an object or object fragments.',
+      severity: 'error',
+    });
+  }
+
+  const issues: NormalizationIssue[] = [];
+  const rosterPositions: YahooRosterPositionSetting[] = [];
+  const positioned: LocatedValue[] = [];
+  collectNamedValues(
+    settingsRecord,
+    'roster_position',
+    located[0].path,
+    positioned,
+  );
+  for (const entry of positioned) {
+    const record = mergeFragments(entry.value);
+    if (record === null) {
+      issues.push({
+        code: 'unknown_shape',
+        path: entry.path,
+        message: 'roster_position was not an object or object fragments.',
+        severity: 'warning',
+      });
+      continue;
+    }
+    const position = firstString(record, ['position']);
+    if (position === null) {
+      issues.push({
+        code: 'missing_field',
+        path: `${entry.path}.position`,
+        message: 'Required position value was missing.',
+        severity: 'warning',
+      });
+      continue;
+    }
+    rosterPositions.push({
+      position,
+      positionType: firstString(record, ['position_type']),
+      count: firstNumber(record, ['count']) ?? 0,
+    });
+  }
+
+  if (rosterPositions.length === 0) {
+    return failure(
+      ...issues,
+      {
+        code: 'unknown_shape' as const,
+        path: located[0].path,
+        message: 'No usable roster_position records were found.',
+        severity: 'error' as const,
+      },
+    );
+  }
+
+  return success(
+    {
+      draftType: firstString(settingsRecord, ['draft_type']),
+      isAuctionDraft: firstBoolean(settingsRecord, ['is_auction_draft']),
+      rosterPositions,
+    },
+    issues,
+  );
+}
+
+/** Normalizes per-team standings: wins, losses, and points for. */
+export function normalizeYahooStandings(
+  input: unknown,
+): NormalizationResult<readonly YahooTeamStanding[]> {
+  return normalizeCollection(input, 'team', (record, path, issues) => {
+    const key = firstString(record, ['team_key']);
+    if (key === null) {
+      missingRequired(issues, path, 'team_key');
+      return null;
+    }
+    return {
+      teamKey: key,
+      wins: firstNumber(record, [
+        'team_standings.outcome_totals.wins',
+        'team_standings.wins',
+      ]),
+      losses: firstNumber(record, [
+        'team_standings.outcome_totals.losses',
+        'team_standings.losses',
+      ]),
+      ties: firstNumber(record, ['team_standings.outcome_totals.ties']),
+      pointsFor: firstNumber(record, ['team_standings.points_for']),
+    };
+  });
 }

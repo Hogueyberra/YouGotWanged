@@ -1,4 +1,19 @@
-export type Position = 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+export type Position =
+  | 'QB'
+  | 'RB'
+  | 'WR'
+  | 'TE'
+  | 'K'
+  | 'DEF'
+  | 'PG'
+  | 'SG'
+  | 'SF'
+  | 'PF'
+  | 'C';
+
+export type Sport = 'football' | 'basketball';
+
+export type LeagueSource = 'demo' | 'yahoo';
 
 export interface Player {
   id: string;
@@ -35,19 +50,22 @@ export interface StartingSlot {
 export interface League {
   id: string;
   name: string;
+  sport: Sport;
   season: number;
   week: number;
   teamCount: number;
   scoringLabel: string;
-  draftType: 'auction';
-  superflex: true;
+  draftType: 'auction' | 'snake';
+  superflex: boolean;
   budget: number;
   rosterLimit: number;
   startingSlots: StartingSlot[];
   myTeamId: string;
   teams: Team[];
   players: Player[];
-  source: 'demo';
+  source: LeagueSource;
+  /** Yahoo league key for provider-backed leagues; absent for demo leagues. */
+  providerLeagueKey?: string;
   snapshotAt: string;
 }
 
@@ -135,7 +153,11 @@ export interface OverviewPayload {
     displayName: string;
   };
   provider: {
-    status: 'pending_approval';
+    status: 'pending_approval' | 'connected';
+    /** True when the actor has Yahoo OAuth tokens stored. */
+    connected: boolean;
+    /** True when the deployment has Yahoo OAuth credentials configured. */
+    connectEnabled: boolean;
     message: string;
   };
 }

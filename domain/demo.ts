@@ -225,6 +225,7 @@ function buildLeague(options: {
   return {
     id: options.id,
     name: options.name,
+    sport: 'football',
     season: 2026,
     week: 1,
     teamCount: teams.length,

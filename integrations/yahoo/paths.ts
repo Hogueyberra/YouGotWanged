@@ -13,6 +13,10 @@ export type YahooFantasyRequest =
       leagueKey: string;
       start?: number;
       count?: number;
+      /** 'A' = available (free agents + waivers). */
+      status?: 'A' | 'FA' | 'W';
+      /** 'OR' = ownership rank, 'AR' = average rank, 'PTS' = fantasy points. */
+      sort?: 'OR' | 'AR' | 'PTS';
     }
   | { kind: 'roster'; teamKey: string; week?: number }
   | { kind: 'transactions'; leagueKey: string };
@@ -49,7 +53,9 @@ function withJsonFormat(path: string): string {
 export function buildYahooFantasyPath(request: YahooFantasyRequest): string {
   switch (request.kind) {
     case 'user-leagues':
-      return withJsonFormat('/users;use_login=1/games;game_keys=nfl/leagues');
+      return withJsonFormat(
+        '/users;use_login=1/games;game_keys=nfl,nba/leagues',
+      );
     case 'league':
       return withJsonFormat(
         `/league/${resourceKey(request.leagueKey, 'leagueKey')}`,
@@ -86,6 +92,20 @@ export function buildYahooFantasyPath(request: YahooFantasyRequest): string {
           throw new TypeError('count may not exceed 25.');
         }
         filters.push(`count=${count}`);
+      }
+      if (request.status !== undefined) {
+        if (!['A', 'FA', 'W'].includes(request.status)) {
+          throw new TypeError(
+            `status must be one of 'A', 'FA', 'W'.`,
+          );
+        }
+        filters.push(`status=${request.status}`);
+      }
+      if (request.sort !== undefined) {
+        if (!['OR', 'AR', 'PTS'].includes(request.sort)) {
+          throw new TypeError(`sort must be one of 'OR', 'AR', 'PTS'.`);
+        }
+        filters.push(`sort=${request.sort}`);
       }
       const suffix = filters.length > 0 ? `;${filters.join(';')}` : '';
       return withJsonFormat(

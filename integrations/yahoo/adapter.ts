@@ -7,6 +7,8 @@ import type {
   ProviderTeam,
   ProviderTransaction,
   ReadOnlyFantasyProvider,
+  YahooLeagueSettings,
+  YahooTeamStanding,
 } from '../providers/contracts.ts';
 import { DEFAULT_YAHOO_RETENTION_HOURS } from '../providers/config.ts';
 import { ProviderHttpClient } from '../providers/http.ts';
@@ -15,6 +17,8 @@ import {
   normalizeYahooLeagues,
   normalizeYahooPlayers,
   normalizeYahooRoster,
+  normalizeYahooSettings,
+  normalizeYahooStandings,
   normalizeYahooTeams,
   normalizeYahooTransactions,
 } from './normalizer.ts';
@@ -85,7 +89,12 @@ export class YahooFantasyReadOnlyAdapter implements ReadOnlyFantasyProvider {
 
   fetchPlayers(
     leagueKey: string,
-    options: { start?: number; count?: number } = {},
+    options: {
+      start?: number;
+      count?: number;
+      status?: 'A' | 'FA' | 'W';
+      sort?: 'OR' | 'AR' | 'PTS';
+    } = {},
   ): Promise<CapturedNormalization<readonly ProviderPlayer[]>> {
     const request = { kind: 'players', leagueKey, ...options } as const;
     return this.fetchAndNormalize(request, normalizeYahooPlayers);
@@ -104,6 +113,20 @@ export class YahooFantasyReadOnlyAdapter implements ReadOnlyFantasyProvider {
   ): Promise<CapturedNormalization<readonly ProviderTransaction[]>> {
     const request = { kind: 'transactions', leagueKey } as const;
     return this.fetchAndNormalize(request, normalizeYahooTransactions);
+  }
+
+  fetchSettings(
+    leagueKey: string,
+  ): Promise<CapturedNormalization<YahooLeagueSettings>> {
+    const request = { kind: 'settings', leagueKey } as const;
+    return this.fetchAndNormalize(request, normalizeYahooSettings);
+  }
+
+  fetchStandings(
+    leagueKey: string,
+  ): Promise<CapturedNormalization<readonly YahooTeamStanding[]>> {
+    const request = { kind: 'standings', leagueKey } as const;
+    return this.fetchAndNormalize(request, normalizeYahooStandings);
   }
 
   /**

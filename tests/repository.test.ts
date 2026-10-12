@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import type { TradeAnalysis, TradeRequest } from '../domain/types.ts';
 import { AppError } from '../server/errors.ts';
@@ -13,10 +15,17 @@ import {
 } from '../server/repository.ts';
 
 const SNAPSHOT_AT = '2026-09-04T12:00:00.000Z';
-const MIGRATION = readFileSync(
-  new URL('../drizzle/0000_stormy_valkyrie.sql', import.meta.url),
-  'utf8',
-);
+const MIGRATION_FILES = readdirSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'drizzle'),
+)
+  .filter((file) => file.endsWith('.sql'))
+  .sort()
+  .map((file) =>
+    readFileSync(
+      new URL(`../drizzle/${file}`, import.meta.url),
+      'utf8',
+    ),
+  );
 
 class SQLiteStatement implements Statement {
   private readonly database: SQLiteDatabase;
@@ -53,8 +62,10 @@ class SQLiteDatabase implements Database {
 
   constructor() {
     this.database.exec('PRAGMA foreign_keys = ON');
-    for (const statement of MIGRATION.split('--> statement-breakpoint')) {
-      if (statement.trim()) this.database.exec(statement);
+    for (const migration of MIGRATION_FILES) {
+      for (const statement of migration.split('--> statement-breakpoint')) {
+        if (statement.trim()) this.database.exec(statement);
+      }
     }
   }
 

@@ -219,6 +219,39 @@
   background: #eaf4c3;
   border: 1px solid #d9e8a0;
 }
+.ffo-yahoo-top-badge {
+  height: 1.75rem;
+  padding-inline: 0.7rem;
+  color: #1f3a5f;
+  background: #dbe9f8;
+  border: 1px solid #b8d2ee;
+}
+.ffo-connect-nudge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ffo-muted);
+}
+.ffo-connect-nudge svg { width: 0.9rem; height: 0.9rem; flex: none; }
+.ffo-connect-nudge button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ffo-forest);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ffo-connect-error { color: #8a2b2b; }
+.ffo-loading-league {
+  display: block;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--ffo-muted);
+  font-size: 0.9rem;
+}
 
 .ffo-content {
   width: min(100%, 96rem);
@@ -408,6 +441,7 @@
 .ffo-roster-summary strong { color: #f6faf8; font: 680 1.55rem var(--font-geist-mono), monospace; }
 .ffo-roster-summary small { color: #869aa2; font-size: 0.68rem; }
 .ffo-roster-summary .ffo-source-demo { color: var(--ffo-lime); }
+.ffo-roster-summary .ffo-source-yahoo { color: #4d8fd1; }
 .ffo-player-cell { display: flex; align-items: center; gap: 0.6rem; }
 .ffo-player-cell div { display: grid; }
 .ffo-player-cell strong { color: #263a43; font-size: 0.79rem; }
@@ -437,6 +471,8 @@
 .ffo-provider-card [data-slot="card-header"] { display: grid; grid-template-columns: auto 1fr auto; align-items: center; border-bottom: 1px solid #e4e9eb; background: linear-gradient(100deg, #fff, #f8faf9); }
 .ffo-yahoo-mark { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; color: #fff; background: #5f01d1; border-radius: 0.8rem; font-size: 1.15rem; font-weight: 850; transform: rotate(-2deg); }
 .ffo-pending-badge { color: #745214; background: #fbefd1; border: 1px solid #eedba9; }
+.ffo-connected-badge { color: #1f5c40; background: #dff0e4; border: 1px solid #bfe0cb; }
+.ffo-connection-note { margin-top: 0.9rem; font-size: 0.78rem; color: #465961; }
 .ffo-provider-facts { display: grid; margin-bottom: 1.25rem; }
 .ffo-provider-facts > div { display: grid; grid-template-columns: 1.5rem 1fr auto; align-items: center; gap: 0.65rem; min-height: 3.2rem; border-bottom: 1px solid #edf0f1; }
 .ffo-provider-facts svg { width: 1rem; color: #537063; }
@@ -645,6 +681,7 @@
   .ffo-builder-card .ffo-demo-chip,
   .ffo-analysis-card [data-slot="card-header"] > [data-slot="badge"],
   .ffo-provider-card .ffo-pending-badge { grid-column: 1 / -1; }
+  .ffo-provider-card .ffo-connected-badge { grid-column: 1 / -1; }
   .ffo-partner-select { align-items: stretch; flex-direction: column; }
   .ffo-partner-select [data-slot="select-trigger"] { width: 100%; min-width: 0; }
   .ffo-analyze-bar { align-items: stretch; flex-direction: column; }

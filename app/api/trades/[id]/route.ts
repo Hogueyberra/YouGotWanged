@@ -9,7 +9,7 @@ import {
 import { AppError } from '../../../../server/errors';
 import { requireActor } from '../../../../server/identity';
 import { repository } from '../../../../server/data';
-import { leagueById } from '../../../../server/service';
+import { leagueByIdAsync } from '../../../../server/service';
 import { STATUS_TRANSITIONS } from '../../../../server/repository';
 type Context = { params: Promise<{ id: string }> };
 export async function PATCH(request: Request, context: Context) {
@@ -17,7 +17,7 @@ export async function PATCH(request: Request, context: Context) {
     const actor = await requireActor();
     const { id } = await context.params;
     const body = await readJson(request);
-    const league = leagueById(body.leagueId);
+    const league = await leagueByIdAsync(body.leagueId, actor.id);
     if (
       typeof body.status !== 'string' ||
       !Object.hasOwn(STATUS_TRANSITIONS, body.status)
@@ -44,8 +44,9 @@ export async function DELETE(request: Request, context: Context) {
   return api(async () => {
     requireSameOrigin(request);
     const actor = await requireActor();
-    const league = leagueById(
+    const league = await leagueByIdAsync(
       new URL(request.url).searchParams.get('leagueId'),
+      actor.id,
     );
     await repository().delete(actor.id, league.id, (await context.params).id);
     return json({ ok: true });

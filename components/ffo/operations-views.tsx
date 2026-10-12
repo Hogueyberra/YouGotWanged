@@ -145,13 +145,19 @@ export function OverviewView({
     standings.findIndex((candidate) => candidate.id === team?.id) + 1,
   );
   const starters = lineup.assignments.filter((assignment) => assignment.player);
+  const isDemo = league.source === 'demo';
+  const sportName = league.sport === 'basketball' ? 'NBA' : 'NFL';
 
   return (
     <div className="ffo-view-stack">
       <ViewIntro
         eyebrow={`Week ${league.week} command center`}
         title="Your front office."
-        description="Your roster, league position, and next decision—organized from one frozen demo snapshot."
+        description={
+          isDemo
+            ? 'Your roster, league position, and next decision—organized from one frozen demo snapshot.'
+            : 'Your roster, league position, and next decision—organized from your live Yahoo league data.'
+        }
         action={
           <Button className="ffo-accent-button" size="lg" onClick={onOpenTrade}>
             Open Trade Center <ArrowRight data-icon="inline-end" />
@@ -162,10 +168,13 @@ export function OverviewView({
       <div className="ffo-demo-banner" role="note">
         <Sparkles aria-hidden="true" />
         <div>
-          <strong>Demo league workspace</strong>
+          <strong>
+            {isDemo ? 'Demo league workspace' : 'Yahoo league workspace'}
+          </strong>
           <span>
-            Every player, projection, score, and auction result shown here is
-            synthetic—not current NFL information.
+            {isDemo
+              ? 'Every player, projection, score, and auction result shown here is synthetic—not current NFL information.'
+              : `Roster data comes from your Yahoo ${sportName} league (read-only). Projections are unavailable through Yahoo's API, so lineup values show as incomplete.`}
           </span>
         </div>
         <time dateTime={league.snapshotAt}>
@@ -188,17 +197,19 @@ export function OverviewView({
           detail={projected === null ? 'Projection coverage incomplete' : `${starters.length}/${league.startingSlots.length} slots filled`}
           tone="green"
         />
-        <MetricCard
-          icon={WalletCards}
-          label="Draft capital used"
-          value={`$${spend}`}
-          detail={`of $${league.budget} auction budget`}
-        />
+        {league.draftType === 'auction' && (
+          <MetricCard
+            icon={WalletCards}
+            label="Draft capital used"
+            value={`$${spend}`}
+            detail={`of $${league.budget} auction budget`}
+          />
+        )}
         <MetricCard
           icon={BadgeDollarSign}
           label="FAAB remaining"
           value={`$${team?.faabRemaining ?? 0}`}
-          detail="Demo waiver budget"
+          detail={isDemo ? 'Demo waiver budget' : 'Yahoo waiver budget'}
         />
       </section>
 
@@ -209,7 +220,9 @@ export function OverviewView({
               <p className="ffo-eyebrow">Week {league.week} operations board</p>
               <CardTitle>Best legal lineup</CardTitle>
               <CardDescription>
-                Highest projected demo lineup using current slot eligibility.
+                {isDemo
+                  ? 'Highest projected demo lineup using current slot eligibility.'
+                  : 'Best legal lineup using current slot eligibility. Projections unavailable.'}
               </CardDescription>
             </div>
             <div className="ffo-score-lockup">
@@ -386,34 +399,43 @@ export function RosterView({ league }: LeagueViewProps) {
       (b.weeklyProjection ?? -Infinity) - (a.weeklyProjection ?? -Infinity),
   );
   const spend = rosterSpend(players);
+  const isDemo = league.source === 'demo';
 
   return (
     <div className="ffo-view-stack">
       <ViewIntro
         eyebrow={`${team?.abbreviation ?? 'TEAM'} · ${league.scoringLabel}`}
         title="My roster"
-        description="A legal-lineup view of your synthetic demo squad. Auction cost is draft history—not current player value."
+        description={
+          isDemo
+            ? 'A legal-lineup view of your synthetic demo squad. Auction cost is draft history—not current player value.'
+            : 'A legal-lineup view of your Yahoo roster (read-only). Projections are unavailable through Yahoo\u2019s API.'
+        }
       />
 
       <div className="ffo-roster-summary">
         <div>
           <span>Projected starters</span>
           <strong>{formatProjection(lineupTotal(lineup))}</strong>
-          <small>{lineup.total === null ? 'coverage incomplete' : 'demo points'}</small>
+          <small>{lineup.total === null ? 'coverage incomplete' : isDemo ? 'demo points' : 'points unavailable'}</small>
         </div>
         <div>
           <span>Roster occupancy</span>
           <strong>{players.length}/{league.rosterLimit}</strong>
           <small>{Math.max(0, league.rosterLimit - players.length)} open</small>
         </div>
-        <div>
-          <span>Auction spend</span>
-          <strong>${spend}</strong>
-          <small>of ${league.budget}</small>
-        </div>
+        {league.draftType === 'auction' && (
+          <div>
+            <span>Auction spend</span>
+            <strong>${spend}</strong>
+            <small>of ${league.budget}</small>
+          </div>
+        )}
         <div>
           <span>Source state</span>
-          <strong className="ffo-source-demo">Demo</strong>
+          <strong className={isDemo ? 'ffo-source-demo' : 'ffo-source-yahoo'}>
+            {isDemo ? 'Demo' : 'Yahoo'}
+          </strong>
           <small>{formatDateTime(league.snapshotAt)}</small>
         </div>
       </div>
@@ -484,6 +506,32 @@ export function RosterView({ league }: LeagueViewProps) {
 }
 
 export function DraftBoardView({ league }: LeagueViewProps) {
+  // The draft board visualizes auction spend, which only exists for demo
+  // auction leagues. Yahoo's read-only API exposes no draft costs, and snake
+  // drafts have no auction ledger.
+  if (league.source !== 'demo' || league.draftType !== 'auction') {
+    return (
+      <div className="ffo-view-stack">
+        <ViewIntro
+          eyebrow={`${league.season} draft board`}
+          title="Draft board"
+          description="Auction spend is only available for demo auction leagues."
+        />
+        <div className="ffo-ledger-callout" role="note">
+          <BadgeDollarSign />
+          <div>
+            <strong>No auction ledger for this league</strong>
+            <span>
+              {league.source === 'yahoo'
+                ? "Yahoo's read-only API does not expose draft costs, so there is nothing to chart here. Roster construction lives under My Roster."
+                : 'This league was not drafted by auction, so there is no spend map to show.'}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const ownership = new Map<string, League['teams'][number]>();
   for (const team of league.teams) {
     for (const playerId of team.playerIds) ownership.set(playerId, team);
@@ -598,10 +646,14 @@ export function DraftBoardView({ league }: LeagueViewProps) {
 
 export function ConnectionsView({
   providerMessage,
+  yahooConnected,
+  yahooConnectEnabled,
   onDeleteData,
   deleting,
 }: {
   providerMessage: string;
+  yahooConnected: boolean;
+  yahooConnectEnabled: boolean;
   onDeleteData: () => Promise<void>;
   deleting: boolean;
 }) {
@@ -620,7 +672,11 @@ export function ConnectionsView({
             <CardTitle>Yahoo Fantasy Sports</CardTitle>
             <CardDescription>{providerMessage}</CardDescription>
           </div>
-          <Badge className="ffo-pending-badge"><CircleDashed /> Pending approval</Badge>
+          {yahooConnected ? (
+            <Badge className="ffo-connected-badge"><Check /> Connected</Badge>
+          ) : (
+            <Badge className="ffo-pending-badge"><CircleDashed /> Pending approval</Badge>
+          )}
         </CardHeader>
         <CardContent>
           <div className="ffo-provider-facts">
@@ -636,6 +692,26 @@ export function ConnectionsView({
           >
             Open Yahoo access application <ExternalLink />
           </a>
+          {yahooConnected ? (
+            <p className="ffo-connection-note">
+              Your Yahoo account is linked. Live reads stay disabled until the
+              provider contract is validated.
+            </p>
+          ) : yahooConnectEnabled ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                window.location.href = '/api/integrations/yahoo/authorize';
+              }}
+            >
+              Connect Yahoo <ArrowRight />
+            </Button>
+          ) : (
+            <p className="ffo-connection-note">
+              Connecting a Yahoo account needs the owner to install the Yahoo
+              credentials on this deployment first.
+            </p>
+          )}
         </CardContent>
       </Card>
 
